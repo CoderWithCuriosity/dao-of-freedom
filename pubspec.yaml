@@ -73,6 +73,8 @@ flutter:
   assets:
     # - assets/images/
     - assets/images/land/
+    - assets/images/land/tiles/
+    - assets/images/player/PC/
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
