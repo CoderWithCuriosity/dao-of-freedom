@@ -1,8 +1,11 @@
+import 'dart:math';
+
 import 'package:flame/components.dart';
 import 'package:flame/sprite.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/game_config.dart';
+import 'teleport_effect.dart';
 
 /// Which way the player is looking. Used to pick the right animation row.
 enum Facing { south, north, east, west }
@@ -19,28 +22,11 @@ class Player extends PositionComponent with HasGameReference {
   final Vector2 moveDirection = Vector2.zero();
 
   // ── Sheet config ───────────────────────────────────────────────────
-  static const bool _useDedupSheet = true;
-
   static const double _cellSize = 224;
-  static int get _cols => _useDedupSheet ? 8 : 6;
+  static const int _cols = 8;
 
   /// Frame indices (global index = row * cols + col).
-  static const _mergedFrames = _Frames(
-    idleFront: [0, 1, 2, 3],
-    idleBack: [24, 25, 26, 27],
-    idleRight: [12, 13, 14, 15],
-    idleLeft: [12, 13, 14, 15],
-    runFront: [48, 49, 50, 51, 52, 53],
-    runBack: [54, 55, 56, 57, 58, 59],
-    runRight: [60, 61, 62, 63, 64, 65],
-    runLeft: [60, 61, 62, 63, 64, 65],
-    attackFront: [62, 63, 64, 65, 66, 67],
-    attackBack: [56, 57, 58, 59, 60, 61],
-    attackRight: [68, 69, 70, 71, 72, 73],
-    attackLeft: [79, 80, 81, 82, 83, 84],
-  );
-
-  static const _dedupFrames = _Frames(
+  static const _frames = _Frames(
     idleFront: [0, 1, 2, 3],
     idleBack: [14, 15, 16, 15],
     idleRight: [8, 8, 9, 9],
@@ -55,8 +41,7 @@ class Player extends PositionComponent with HasGameReference {
     attackFront: [62, 63, 64, 65, 66, 67],
     attackBack: [56, 57, 58, 59, 60, 61],
     attackRight: [72, 46, 47, 48, 68, 46],
-    // attackRight: [68, 69, 70, 71, 72],
-    attackLeft: [82, 48, 46,  80, 47, 45],
+    attackLeft: [82, 48, 46, 80, 47, 45],
   );
 
   // ── Animations ─────────────────────────────────────────────────────
@@ -79,6 +64,60 @@ class Player extends PositionComponent with HasGameReference {
 
   static const double _artScale = 1.4;
 
+  /// Where the feet are, as a fraction of the drawn sprite height measured
+  /// from the sprite centre. Tune this if the circle looks too high / low.
+  static const double _feetOffsetFactor = 0.42;
+
+  // ── Flying / teleport state ────────────────────────────────────────
+  bool _flying = false;
+  bool _teleportMode = false;
+  double _teleportCooldown = 0;
+
+  /// 0 = on the ground, 1 = fully levitating (eased for take-off/landing).
+  double _hoverBlend = 0;
+  double _hoverTime = 0;
+
+  bool get isFlying => _flying;
+  bool get teleportMode => _teleportMode;
+  bool get canTeleportNow => _teleportMode && _teleportCooldown <= 0;
+
+  /// Fly toggle. Turning flying OFF also turns teleport OFF
+  /// (teleport only works while flying).
+  void toggleFlying() {
+    _flying = !_flying;
+    if (!_flying) _teleportMode = false;
+  }
+
+  /// Teleport toggle. Turning it ON forces flying ON.
+  void toggleTeleport() {
+    _teleportMode = !_teleportMode;
+    if (_teleportMode) _flying = true;
+  }
+
+  /// Jump to [target] (world coords) with a spark at both ends.
+  /// Returns false if teleport is off or on cooldown.
+  bool teleportTo(Vector2 target) {
+    if (!canTeleportNow) return false;
+
+    final from = position.clone();
+    _teleportCooldown = GameConfig.teleportCooldown;
+
+    // Face the direction we jumped.
+    final d = target - from;
+    if (d.x.abs() > d.y.abs()) {
+      _facing = d.x >= 0 ? Facing.east : Facing.west;
+    } else if (d.y != 0) {
+      _facing = d.y >= 0 ? Facing.south : Facing.north;
+    }
+
+    position.setFrom(target);
+
+    parent?.add(TeleportEffect(position: from));
+    parent?.add(TeleportEffect(position: target.clone()));
+    return true;
+  }
+
+  // ── Attack ─────────────────────────────────────────────────────────
   bool _isAttacking = false;
 
   void attack() {
@@ -107,7 +146,7 @@ class Player extends PositionComponent with HasGameReference {
     final img = await game.images.load('player/PC/CHARACTER_1.png');
     final sheet = SpriteSheet(image: img, srcSize: Vector2.all(_cellSize));
 
-    final f = _useDedupSheet ? _dedupFrames : _mergedFrames;
+    final f = _frames;
 
     SpriteAnimation fromIndices(
       List<int> indices, {
@@ -151,9 +190,18 @@ class Player extends PositionComponent with HasGameReference {
     _ticker = anim.createTicker();
   }
 
+  static double _approach(double v, double target, double step) {
+    final d = target - v;
+    return d.abs() <= step ? target : v + step * d.sign;
+  }
+
   @override
   void update(double dt) {
     super.update(dt);
+
+    _hoverTime += dt;
+    _hoverBlend = _approach(_hoverBlend, _flying ? 1 : 0, dt * 5);
+    if (_teleportCooldown > 0) _teleportCooldown -= dt;
 
     // If attacking, update ticker and skip movement animation updates
     if (_isAttacking) {
@@ -161,16 +209,25 @@ class Player extends PositionComponent with HasGameReference {
       return;
     }
 
-    if (moveDirection.length2 > 0) {
+    final moving = moveDirection.length2 > 0;
+
+    if (moving) {
       final dir = moveDirection.normalized();
-      position += dir * GameConfig.playerSpeed * dt;
+      final speed =
+          GameConfig.playerSpeed * (_flying ? GameConfig.flySpeedMultiplier : 1);
+      position += dir * speed * dt;
 
       if (dir.x.abs() > dir.y.abs()) {
         _facing = dir.x >= 0 ? Facing.east : Facing.west;
       } else {
         _facing = dir.y >= 0 ? Facing.south : Facing.north;
       }
+    }
 
+    // Levitating = idle pose even while moving. Walking = run pose.
+    final useRun = moving && !_flying;
+
+    if (useRun) {
       switch (_facing) {
         case Facing.south:
           _setAnimation(_runFront);
@@ -203,9 +260,18 @@ class Player extends PositionComponent with HasGameReference {
 
     final flipX = _facing == Facing.west;
     final drawSize = size * _artScale;
+    final feetY = size.y / 2 + drawSize.y * _feetOffsetFactor;
+
+    // Circle stays on the ground, body floats above it.
+    if (_hoverBlend > 0.01) {
+      _renderLevitationCircle(canvas, feetY);
+    }
+
+    final lift = _hoverBlend *
+        (GameConfig.hoverHeight + sin(_hoverTime * 3) * 3); // gentle bob
 
     canvas.save();
-    canvas.translate(size.x / 2, size.y / 2);
+    canvas.translate(size.x / 2, size.y / 2 - lift);
     if (flipX) canvas.scale(-1, 1);
     frame.render(
       canvas,
@@ -213,6 +279,50 @@ class Player extends PositionComponent with HasGameReference {
       size: drawSize,
     );
     canvas.restore();
+  }
+
+  void _renderLevitationCircle(Canvas canvas, double feetY) {
+    final base = _teleportMode ? GameConfig.colorTeleport : GameConfig.colorFly;
+    final b = _hoverBlend;
+    final pulse = 1 + 0.08 * sin(_hoverTime * 4);
+
+    final w = 58 * pulse * b;
+    final rect = Rect.fromCenter(
+      center: Offset(size.x / 2, feetY),
+      width: w,
+      height: w * 0.32,
+    );
+
+    // Soft glow fill
+    canvas.drawOval(rect, Paint()..color = base.withAlpha((70 * b).round()));
+
+    // Outer ring
+    canvas.drawOval(
+      rect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = base.withAlpha((200 * b).round()),
+    );
+
+    // Inner ring
+    canvas.drawOval(
+      rect.deflate(w * 0.12),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = base.withAlpha((120 * b).round()),
+    );
+
+    // Two bright arcs spinning around the ring
+    final arcPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFFFFFFFF).withAlpha((230 * b).round());
+    final a = _hoverTime * 2.5;
+    canvas.drawArc(rect, a, 0.9, false, arcPaint);
+    canvas.drawArc(rect, a + pi, 0.9, false, arcPaint);
   }
 }
 
