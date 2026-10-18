@@ -8,6 +8,9 @@ import '../models/player_status.dart';
 import 'components/ground.dart';
 import 'components/player.dart';
 import 'worlds/world_definition.dart';
+import 'package:flame/input.dart';
+
+
 
 class DaoGame extends FlameGame with HasCollisionDetection {
   DaoGame({required this.playerStatus, required this.worldDef});
@@ -17,6 +20,7 @@ class DaoGame extends FlameGame with HasCollisionDetection {
 
   late final Player player;
   late final JoystickComponent joystick;
+  late final HudButtonComponent attackButton;
 
   @override
   Color backgroundColor() => worldDef.voidColor;
@@ -58,6 +62,23 @@ class DaoGame extends FlameGame with HasCollisionDetection {
       margin: const EdgeInsets.only(left: 120, bottom: 120),
     );
     camera.viewport.add(joystick);
+
+    // Attack Button setup
+    attackButton = HudButtonComponent(
+      button: CircleComponent(
+        radius: 35,
+        paint: Paint()..color = const Color(0x88FF0000),
+      ),
+      buttonDown: CircleComponent(
+        radius: 35,
+        paint: Paint()..color = const Color(0xFFFF0000),
+      ),
+      margin: const EdgeInsets.only(right: 120, bottom: 120),
+      onPressed: () => player.attack(),
+      
+    );
+
+    camera.viewport.add(attackButton);
 
     debugPrint('Entered ${worldDef.name} as ${playerStatus.name}');
   }
