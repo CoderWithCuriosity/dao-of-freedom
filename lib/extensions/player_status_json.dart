@@ -6,15 +6,26 @@ import '../models/element.dart';
 import '../models/item.dart';
 import '../models/law.dart';
 import '../models/player_status.dart';
+import '../models/race.dart';
 import '../models/resource_pool.dart';
 import '../models/technique.dart';
 import '../models/weapon.dart';
+
+PlayerRace _raceFromNameSafe(Object? raw) {
+  if (raw is! String) return PlayerRace.human;
+  try {
+    return PlayerRace.values.byName(raw);
+  } catch (_) {
+    return PlayerRace.human;
+  }
+}
 
 extension PlayerStatusJson on PlayerStatus {
   Map<String, dynamic> toJson() => {
     'name': name,
     'age': age,
     'temperament': temperament.name,
+    'race': race.name,
     'baseAffinities': baseAffinities.map((e) => e.name).toList(),
     'derivedAffinities': derivedAffinities.map((e) => e.name).toList(),
     'realm': realm.name,
@@ -39,6 +50,8 @@ extension PlayerStatusJson on PlayerStatus {
     'nascentSoulActive': nascentSoulActive,
     'isSoulForm': isSoulForm,
     'rebirthsRemaining': rebirthsRemaining,
+    'tribulationImmunityRemaining': tribulationImmunityRemaining,
+    'immortalSparkCharges': immortalSparkCharges,
     'inventory': inventory.map((i) => i.toJson()).toList(),
     'lifeBoundWeapon': lifeBoundWeapon?.toJson(),
     'knownTechniques': knownTechniques.map((t) => t.toJson()).toList(),
@@ -47,15 +60,13 @@ extension PlayerStatusJson on PlayerStatus {
   };
 }
 
-/// `fromJson` can't live in an extension because extensions can't
-/// declare static members that shadow the class. Put it here as a
-/// top-level function instead.
 PlayerStatus playerStatusFromJson(Map<String, dynamic> json) => PlayerStatus(
   name: json['name'] as String,
   age: json['age'] as int? ?? 16,
   temperament: BodyTemperament.values.byName(
     json['temperament'] as String? ?? 'mortal',
   ),
+  race: _raceFromNameSafe(json['race']),
   baseAffinities: (json['baseAffinities'] as List<dynamic>? ?? [])
       .map((e) => Element.values.byName(e as String))
       .toList(),
@@ -86,6 +97,10 @@ PlayerStatus playerStatusFromJson(Map<String, dynamic> json) => PlayerStatus(
   nascentSoulActive: json['nascentSoulActive'] as bool? ?? false,
   isSoulForm: json['isSoulForm'] as bool? ?? false,
   rebirthsRemaining: json['rebirthsRemaining'] as int? ?? 0,
+  tribulationImmunityRemaining:
+      (json['tribulationImmunityRemaining'] as num?)?.toInt() ?? 0,
+  immortalSparkCharges:
+      (json['immortalSparkCharges'] as num?)?.toInt() ?? 0,
   inventory: (json['inventory'] as List<dynamic>? ?? [])
       .map((i) => Item.fromJson(i as Map<String, dynamic>))
       .toList(),

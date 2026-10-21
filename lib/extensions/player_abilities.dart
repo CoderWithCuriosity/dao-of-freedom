@@ -1,6 +1,7 @@
 import '../models/cultivation_realm.dart';
 import '../models/element.dart';
 import '../models/player_status.dart';
+import '../models/race.dart';
 import '../core/vec2.dart';
 
 extension PlayerAbilities on PlayerStatus {
@@ -55,6 +56,18 @@ extension PlayerAbilities on PlayerStatus {
     health.current = health.max * 0.1;
   }
 
+  // ── IMMORTAL'S SPARK ─────────────────────────────────────────────
+  /// Call when health.current would reach 0. Consumes one charge and
+  /// restores to 50% HP. Returns true if the revive was consumed
+  /// (player survives), false if the player should die normally.
+  bool tryImmortalRevive() {
+    if (immortalSparkCharges <= 0) return false;
+    immortalSparkCharges--;
+    health.current = health.max * 0.5;
+    // TODO: trigger a golden revive effect in the Flame game layer.
+    return true;
+  }
+
   // ELEMENT QUERIES
   bool get hasIceAffinity =>
       derivedAffinities.contains(DerivedElement.ice) ||
@@ -69,13 +82,33 @@ extension PlayerAbilities on PlayerStatus {
   // CULTIVATION PROGRESS
   bool get canBreakthrough => cultivationExp >= cultivationExpNeeded;
 
+  /// Race-adjusted exp gain.
   void gainCultivationExp(double amount) {
-    cultivationExp += amount;
+    final mul = raceProfileFor(race).cultivationSpeedMul;
+    cultivationExp += amount * mul;
   }
 
-  void breakthrough() {
-    if (!canBreakthrough) return;
+  /// Try to break through. Consumes tribulation immunity if the player
+  /// has any (Immortal first-breakthrough protection).
+  /// Returns true if the breakthrough actually happened.
+  bool attemptBreakthrough() {
+    if (!canBreakthrough) return false;
 
+    if (tribulationImmunityRemaining > 0) {
+      tribulationImmunityRemaining--;
+      _doBreakthrough();
+      return true;
+    }
+
+    // Future: roll a random tribulation failure here for non-Immortal.
+    _doBreakthrough();
+    return true;
+  }
+
+  /// Backwards-compatible alias for the old signature.
+  void breakthrough() => attemptBreakthrough();
+
+  void _doBreakthrough() {
     if (subStage == SubStage.late) {
       if (realm.index < CultivationRealm.values.length - 1) {
         realm = CultivationRealm.values[realm.index + 1];
@@ -89,6 +122,7 @@ extension PlayerAbilities on PlayerStatus {
     cultivationExpNeeded *= 2.5;
     _applyRealmBonuses();
     refreshRealmUnlocks();
+    _applyHalfBloodLateScaling();
   }
 
   void _applyRealmBonuses() {
@@ -101,6 +135,17 @@ extension PlayerAbilities on PlayerStatus {
     defense *= 1.5;
     speed *= 1.3;
     spiritualSense *= 1.4;
+  }
+
+  /// Half-blood's "hard start / strong late" payoff — small stacking
+  /// boosts from Foundation Establishment onward.
+  void _applyHalfBloodLateScaling() {
+    if (race != PlayerRace.halfBlood) return;
+    if (realm.index < CultivationRealm.foundationEstablishment.index) return;
+    attackPower *= 1.10;
+    defense *= 1.10;
+    speed *= 1.05;
+    spiritualSense *= 1.05;
   }
 
   /// Public so tests / save-load / cheat codes can call it.

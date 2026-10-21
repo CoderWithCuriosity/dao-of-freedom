@@ -20,7 +20,7 @@ class GameConfig {
   static const double playerSize = 48.0;
 
   /// Movement speed in world units per second.
-  static const double playerSpeed = 160.0;
+  static const double playerSpeed = 140.0;
 
   // ---------------------------------------------------------------------------
   // Flying / teleport

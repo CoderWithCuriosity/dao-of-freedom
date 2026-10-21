@@ -2,21 +2,26 @@ import '../models/body_temperament.dart';
 import '../models/cultivation_realm.dart';
 import '../models/element.dart';
 import '../models/player_status.dart';
+import '../models/race.dart';
 import '../models/resource_pool.dart';
+import 'race_apply.dart';
 
 class PlayerStatusFactory {
   PlayerStatusFactory._();
 
   /// A brand-new mortal cultivator at Qi Condensation Early.
+  /// The race's multipliers and passives are applied automatically.
   static PlayerStatus newCultivator(
     String name, {
     List<Element>? baseAffinities,
     List<DerivedElement>? derivedAffinities,
     BodyTemperament temperament = BodyTemperament.mortal,
+    PlayerRace race = PlayerRace.human,
   }) {
-    return PlayerStatus(
+    final s = PlayerStatus(
       name: name,
       temperament: temperament,
+      race: race,
       baseAffinities: baseAffinities,
       derivedAffinities: derivedAffinities,
       realm: CultivationRealm.qiCondensation,
@@ -26,6 +31,8 @@ class PlayerStatusFactory {
       body: ResourcePool(current: 20, max: 20, regenPerSecond: 0.5),
       health: ResourcePool(current: 100, max: 100, regenPerSecond: 0.1),
     );
+
+    return applyRace(s, raceProfileFor(race));
   }
 
   /// A Foundation Establishment cultivator — can fly temporarily.
@@ -33,10 +40,12 @@ class PlayerStatusFactory {
     String name, {
     List<Element>? baseAffinities,
     List<DerivedElement>? derivedAffinities,
+    PlayerRace race = PlayerRace.human,
   }) {
-    return PlayerStatus(
+    final s = PlayerStatus(
       name: name,
       age: 40,
+      race: race,
       baseAffinities: baseAffinities,
       derivedAffinities: derivedAffinities,
       realm: CultivationRealm.foundationEstablishment,
@@ -50,6 +59,8 @@ class PlayerStatusFactory {
       speed: 30,
       spiritualSense: 25,
     );
+
+    return applyRace(s, raceProfileFor(race));
   }
 
   /// A Void Refinement cultivator — can teleport at will.
@@ -57,10 +68,12 @@ class PlayerStatusFactory {
     String name, {
     List<Element>? baseAffinities,
     List<DerivedElement>? derivedAffinities,
+    PlayerRace race = PlayerRace.human,
   }) {
-    return PlayerStatus(
+    final s = PlayerStatus(
       name: name,
       age: 1500,
+      race: race,
       baseAffinities: baseAffinities,
       derivedAffinities: derivedAffinities,
       realm: CultivationRealm.voidRefinement,
@@ -78,5 +91,7 @@ class PlayerStatusFactory {
       nascentSoulActive: true,
       rebirthsRemaining: 1,
     );
+
+    return applyRace(s, raceProfileFor(race));
   }
 }

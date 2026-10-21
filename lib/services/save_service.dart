@@ -14,6 +14,7 @@ import '../models/element.dart';
 import '../models/item.dart';
 import '../models/law.dart';
 import '../models/player_status.dart';
+import '../models/race.dart';
 import '../models/resource_pool.dart';
 import '../models/technique.dart';
 import '../models/weapon.dart';
@@ -122,6 +123,7 @@ class SaveService {
       name: 'Li Wei',
       age: 24,
       temperament: BodyTemperament.chaosBody,
+      race: PlayerRace.immortal,
 
       // Five-element affinity + awakened derivations
       baseAffinities: [
@@ -156,7 +158,7 @@ class SaveService {
 
       // Flight / mobility
       isFlying: false,
-      canFlyPermanently: true,   // unlocked at Core Formation
+      canFlyPermanently: true,
       flightTimeRemaining: 0,
 
       // Teleport (not yet — Void Refinement+)
@@ -168,6 +170,10 @@ class SaveService {
       nascentSoulActive: false,
       isSoulForm: false,
       rebirthsRemaining: 0,
+
+      // Race passives (demo: give the Immortal one spark charge)
+      tribulationImmunityRemaining: 1,
+      immortalSparkCharges: 1,
 
       // Inventory
       inventory: const [

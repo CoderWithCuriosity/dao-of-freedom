@@ -5,6 +5,7 @@ import 'domain.dart';
 import 'element.dart';
 import 'item.dart';
 import 'law.dart';
+import 'race.dart';
 import 'resource_pool.dart';
 import 'technique.dart';
 import 'weapon.dart';
@@ -14,6 +15,7 @@ class PlayerStatus {
   String name;
   int age;
   BodyTemperament temperament;
+  PlayerRace race;
   List<Element> baseAffinities;
   List<DerivedElement> derivedAffinities;
 
@@ -51,6 +53,10 @@ class PlayerStatus {
   bool isSoulForm;
   int rebirthsRemaining;
 
+  // RACE PASSIVES (tickable)
+  int tribulationImmunityRemaining;
+  int immortalSparkCharges;
+
   // INVENTORY
   List<Item> inventory;
   Weapon? lifeBoundWeapon;
@@ -64,6 +70,7 @@ class PlayerStatus {
     required this.name,
     this.age = 16,
     this.temperament = BodyTemperament.mortal,
+    this.race = PlayerRace.human,
     List<Element>? baseAffinities,
     List<DerivedElement>? derivedAffinities,
     this.realm = CultivationRealm.qiCondensation,
@@ -88,6 +95,8 @@ class PlayerStatus {
     this.nascentSoulActive = false,
     this.isSoulForm = false,
     this.rebirthsRemaining = 0,
+    this.tribulationImmunityRemaining = 0,
+    this.immortalSparkCharges = 0,
     List<Item>? inventory,
     this.lifeBoundWeapon,
     List<Technique>? knownTechniques,
